@@ -1,0 +1,62 @@
+# Ablation B: Denoiser parameterization only (no preconditioning)
+# This tests the benefit of D_theta over epsilon_theta, independent of EDM precond
+n_qubits: 2
+model_type: "edm"
+
+sigma_min: 0.001
+sigma_max: 1.22
+sigma_data_diag: 0.2341  # Calibrated (2026-07-31), matching n2_edm.yaml
+sigma_data_off: 0.2183
+
+# Key ablation: no EDM preconditioning (c_skip=0, c_out=1, c_in=1)
+use_preconditioning: false
+P_mean: 0.0    # Uniform sampling
+P_std: 10.0    # Wide, approximates uniform
+
+rho: 7.0
+n_steps_eval: 35
+
+model:
+  base_channels: 64
+  dim_mults: [1, 2, 4]
+  num_res_blocks: 2
+  cond_dim: 128
+  cond_dropout_prob: 0.1
+  time_emb_dim: 256
+
+lambda_rank: 0.0
+lambda_rank_warmup: 1000
+lambda_meas: 0.0
+lambda_meas_warmup: 1000
+
+training:
+  batch_size: 256
+  learning_rate: 2.0e-4
+  lr_scheduler: "cosine"
+  warmup_steps: 500
+  epochs: 300
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 50
+  val_every: 20
+  log_every: 100
+
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000
+  state_types:
+    pure_haar: 0.40
+    mixed_hs: 0.30
+    mixed_ginibre: 0.10
+    thermal: 0.10
+    product: 0.10
+  regularization_eps: 1.0e-6
+  seed: 42
+
+evaluation:
+  shot_levels: [10, 20, 30, 50, 100, 300]
+  n_repeats: 10
+  mle_max_iter: 5000
+  mle_regularization: 0.01

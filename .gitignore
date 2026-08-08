@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+eggs/
+*.egg
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.venv/
+*.conda/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data cache (large files, regenerate as needed).
+# Use "/data/" (leading slash) so that only the root-level data/ directory
+# is ignored — not src/data/ or any other nested data/ directories.
+/data/
+*.pkl
+*.pickle
+
+# Outputs (model checkpoints, logs, figures)
+outputs/
+*.pt
+
+# Server-sync backup copies (files copied to/from the training server
+# for comparison; never commit these — they duplicate tracked sources).
+.server_compare/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# 服务器/运维脚本（含本地凭据，勿提交）
+ssh_upload.py
+check_*.py
+probe_*.py
+monitor_*.py
+cap128_*.py
+smoke_*.py
+compare_cfg_server.py
+server_state_report.txt
+*_out.txt
+*.out.txt
+
+# 实验过程记录（含服务器信息）
+EXPERIMENTS_RESULTS*.md
+NEXT_STEPS.md
+bloch_improvement_plan.md
+n3_300ep_eval_records.md
+
+# 打包/中间产物
+*.tar.gz
+sections.zip
+paper_parameterization_geometry*.zip
+paper_parameterization_geometry*.pdf
+
+# 实验数据目录
+deconfound_results/
+eval_results_2q/
+results_records/
+outputs_*.json

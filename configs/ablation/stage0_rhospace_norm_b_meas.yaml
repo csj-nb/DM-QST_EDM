@@ -1,0 +1,111 @@
+# ============================================================
+# LOSS-SPACE EXPERIMENT stage0_rhospace_norm_b + lambda_meas (stage 3)
+# 在修正 B（per-dim sigma_data）基础上开启测量一致性损失：
+#   ||Born(rho_pred) - observed_freq||^2 (masked-L2, 只惩罚观测到的输出)
+# 目的：T1/T2 诊断定位"条件后验中心偏置"，lambda_meas 直接注入似然，
+#       训练端 Val Fid 目标 > 0.76（对照 norm_b 平台 0.7516）。
+#   lambda_fid: 0.0
+#   iw_mmse: false
+#   dps_scale: 0.0
+#   cfg_mode: none (训练配置；评估时用 cfg4 协议)
+# ============================================================
+# 2-qubit EDM with low-shot-friendly representation (scheme 1).
+model_type: "edm"
+n_qubits: 2
+diffusion_timesteps: 1000        # unused by EDM (continuous sigma), kept for compat
+beta_schedule: "cosine"
+beta_start: 1.0e-4
+beta_end: 0.02
+
+# --- EDM noise schedule (calibrated 2026-08-02, from n2_edm.yaml) ---
+sigma_min: 0.001
+sigma_max: 1.22
+cholesky_normalize: true  # Fix A: unit-norm Cholesky vectors (remove redundant scaling)
+sigma_data_per_dim: [0.188126, 0.224821, 0.193872, 0.157761, 0.279667, 0.280843, 0.281294, 0.282385, 0.275968, 0.280702, 0.117214, 0.114985, 0.119020, 0.120285, 0.111495, 0.112217]  # Fix B: per-coordinate sigma_data (16 coords, 50000 normalized states)
+sigma_data_diag: 0.2177        # Fix A: normalized (unit-norm) vectors, re-calibrated
+sigma_data_off: 0.1983         # Fix A: normalized (unit-norm) vectors, re-calibrated
+P_mean: -1.2
+P_std: 1.2
+rho: 7.0
+n_steps_eval: 35
+
+# --- Fidelity-aware auxiliary loss ---
+lambda_fid: 0.0
+lambda_fid_warmup: 1000
+
+# --- Measurement-consistency loss (likelihood-aware training) ---
+# stage 3: lambda_meas>0 (train-side, retrain)
+# l2 masked 形式：mean (p_j - m_j)^2 over OBSERVED outcomes only
+lambda_meas: 0.1
+lambda_meas_warmup: 1000
+
+# --- Low-shot representation (scheme 1) ---
+use_arcsin_sqrt: true            # z = arcsin(sqrt(p)), well-defined at 0/1
+use_counts_channel: true         # append log1p-normalized raw counts (cond dim 36 -> 72)
+use_shot_channel: false
+use_fisher_z: false              # disabled when use_arcsin_sqrt is true
+
+# --- Model ---
+model:
+  dim: null                      # auto: 2 * (2^n)^2
+  hidden_dim: 256
+  dim_mults: [1, 2, 4]
+  cond_dim: 128
+  cond_dropout_prob: 0.1
+  loss_space: "rho"   # main loss in density-matrix space (HS distance)
+
+  time_emb_dim: 256
+  attn_resolutions: [8]
+  num_res_blocks: 2
+
+# --- Training ---
+training:
+  batch_size: 128
+  learning_rate: 4.0e-3         # 实际由命令行 --lr 2e-4 覆盖（与 norm_b 一致）
+  lr_scheduler: "cosine"
+  warmup_steps: 500
+  epochs: 300
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 50
+  val_every: 10
+  log_every: 100
+
+# --- Variable-shot training (critical for low-shot generalization) ---
+use_variable_shots: true
+n_shots_min: 10
+n_shots_max: 50000
+
+# --- Data ---
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000    # full-shot reference for val/test
+  state_types:
+    pure_haar: 0.30
+    mixed_hs: 0.30
+    mixed_ginibre: 0.10
+    thermal: 0.10
+    product: 0.10
+    rqc: 0.10                   # random quantum circuit outputs (needs qiskit)
+  regularization_eps: 1.0e-6
+  seed: 42
+
+# --- ERDM-style loss reweighting ---
+use_loss_reweighting: true
+
+# --- Evaluation ---
+evaluation:
+  n_samples_per_state: 20       # posterior-mean (MMSE) averaging: sample K
+  iw_mmse: false
+  dps_scale: 0.0
+  ddim_steps: null              # EDM uses its own n_steps
+  mle_max_iter: 5000
+  mle_regularization: 0.01
+  shot_levels: [10, 20, 30, 50, 100, 300]   # prior-advantage band (low-shot regime)
+  n_repeats: 10
+  cfg_mode: none             # 训练配置；评估时用 _cfg4 变体 (fixed w=4)
+  cfg_weight: 4.0
+  cfg_weight_max: 2.0            # used by "adaptive" (upper bound)
+  cfg_n_ref: 1000                # used by "adaptive" (half-saturation shot count)

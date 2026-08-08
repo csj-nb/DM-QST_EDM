@@ -1,0 +1,142 @@
+# ============================================================
+# ABLATION stage4_full_ladder: stage3 + DPS 采样引导 + IW-MMSE（= v3 全开）
+# 基于 n2_lowshot.yaml 逐级裁剪（含 warmup 1000 修正）。与上一级差异开关：
+#   use_shot_channel: true
+#   lambda_fid: 0.5
+#   lambda_meas: 0.1
+#   iw_mmse: true
+#   dps_scale: 0.1
+#   cfg_mode: none
+# ============================================================
+# 2-qubit EDM with low-shot-friendly representation (scheme 1).
+#
+# Scheme 1 = arcsin-sqrt transform (variance-stabilizing, no clipping at
+# 0/1) + raw counts channel (preserves the shot budget / confidence that
+# pure frequencies discard). Both changes target the low-shot regime
+# (100-1000 shots) where frequencies are sparse and logit(Fisher z) clips.
+#
+# Compare against configs/n2_edm.yaml (Fisher z, no counts channel).
+
+# --- Core ---
+model_type: "edm"
+n_qubits: 2
+diffusion_timesteps: 1000        # unused by EDM (continuous sigma), kept for compat
+beta_schedule: "cosine"
+beta_start: 1.0e-4
+beta_end: 0.02
+
+# --- EDM noise schedule (calibrated 2026-08-02, from n2_edm.yaml) ---
+# sigma_max=0.8 was clamping ~21% of LogNormal(-1.2,1.2) training sigmas,
+# biasing learning near the high-noise boundary. Calibrated values:
+sigma_min: 0.001
+sigma_max: 1.22
+sigma_data_diag: 0.2341        # empirical std of diagonal Cholesky elements
+sigma_data_off: 0.2183         # empirical std of off-diagonal Cholesky elements
+P_mean: -1.2
+P_std: 1.2
+rho: 7.0
+n_steps_eval: 35
+
+# --- Fidelity-aware auxiliary loss ---
+# Train target is Cholesky-space L2, which does not directly maximize
+# fidelity. Add lambda_fid * (1 - F(rho_pred, rho_true)) so the model is
+# pushed toward states that score well on the evaluation metric.
+# warmup: linearly ramp lambda from 0 to lambda_fid over the first steps.
+lambda_fid: 0.5
+lambda_fid_warmup: 1000   # 3000->1000 (2026-08-03): at 5000 states x batch 128, 3000 steps
+                           # = ~39 epochs; a 50-epoch run never saw the aux losses. 1000
+                           # steps (~13 epochs) lets them act within short validation runs.
+
+# --- Measurement-consistency loss (likelihood-aware training) ---
+# Forces the predicted state to explain the observed measurement:
+# ||Born(rho_pred) - observed_freq||^2. This is the "explicit likelihood"
+# stage of the likelihood-utilization ladder; requires retraining.
+# Technical line (add one stage at a time, keep the rest off):
+#   stage 1: lambda_meas=0, iw_mmse=false, dps_scale=0   (baseline)
+#   stage 2: iw_mmse=true                                (eval-side, no retrain)
+#   stage 3: lambda_meas>0                               (train-side, retrain)
+#   stage 4: dps_scale>0                                 (sample-side, no retrain)
+# NOTE: full-ladder run (stages 2+3+4 all on) per user request.
+lambda_meas: 0.1
+lambda_meas_warmup: 1000
+
+# --- Low-shot representation (scheme 1) ---
+use_arcsin_sqrt: true            # z = arcsin(sqrt(p)), well-defined at 0/1
+use_counts_channel: true         # append log1p-normalized raw counts (cond dim 36 -> 72)
+use_shot_channel: true           # append log1p(n_shots)/log1p(n_shots_max) so the model
+                                 # can tell a 10000-shot from a 50-shot measurement
+                                 # (cond dim 72 -> 73)
+use_fisher_z: false              # disabled when use_arcsin_sqrt is true
+
+# --- Model ---
+model:
+  dim: null                      # auto: 2 * (2^n)^2
+  hidden_dim: 256
+  dim_mults: [1, 2, 4]
+  cond_dim: 128
+  cond_dropout_prob: 0.1
+  time_emb_dim: 256
+  attn_resolutions: [8]
+  num_res_blocks: 2
+
+# --- Training ---
+training:
+  batch_size: 128
+  learning_rate: 2.0e-4
+  lr_scheduler: "cosine"
+  warmup_steps: 500
+  epochs: 300
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 50
+  val_every: 10
+  log_every: 100
+
+# --- Variable-shot training (critical for low-shot generalization) ---
+use_variable_shots: true
+n_shots_min: 10                 # train down to 10 shots so the low-shot
+                                # posterior is calibrated (not extrapolated)
+n_shots_max: 50000
+
+# --- Data ---
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000    # full-shot reference for val/test
+  state_types:
+    pure_haar: 0.30
+    mixed_hs: 0.30
+    mixed_ginibre: 0.10
+    thermal: 0.10
+    product: 0.10
+    rqc: 0.10                   # random quantum circuit outputs (needs qiskit)
+  regularization_eps: 1.0e-6
+  seed: 42
+
+# --- ERDM-style loss reweighting ---
+use_loss_reweighting: true
+
+# --- Evaluation ---
+evaluation:
+  n_samples_per_state: 20       # posterior-mean (MMSE) averaging: sample K
+                                # times, average density matrices
+  iw_mmse: true                 # stage 2: importance-weight samples by Born
+                                # likelihood under observed frequencies
+  dps_scale: 0.1                # stage 4: DPS sampling guidance strength
+                                # (explicit Born-rule likelihood gradient at
+                                # sampling time; 0 disables, >0 enables.
+                                # When enabled, overrides CFG path)
+  ddim_steps: null              # EDM uses its own n_steps
+  mle_max_iter: 5000
+  mle_regularization: 0.01
+  shot_levels: [10, 20, 30, 50, 100, 300]   # prior-advantage band (low-shot regime)
+  n_repeats: 10
+  # --- Shot-adaptive classifier-free guidance ---
+  # Low-shot measurements are noisy -> lean on prior (weak guidance);
+  # high-shot measurements are reliable -> amplify conditioning.
+  # w(n) = w_max * sqrt(n / (n + n_ref)); set "none" to disable CFG.
+  cfg_mode: none             # none | fixed | adaptive
+  cfg_weight: 2.0                # used by "fixed"
+  cfg_weight_max: 2.0            # used by "adaptive" (upper bound)
+  cfg_n_ref: 1000                # used by "adaptive" (half-saturation shot count)

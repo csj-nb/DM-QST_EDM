@@ -1,0 +1,22 @@
+name: dm-qst
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy=1.26.4
+  - scipy>=1.11
+  - matplotlib>=3.7
+  - pytorch>=2.2
+  - tqdm>=4.65
+  - pyyaml>=6.0
+  - jupyter
+  - ipykernel
+  - pip:
+      - qiskit>=1.0
+      - qiskit-ibm-runtime>=0.30
+      - qutip>=5.0
+      - tensorboard
+      - pytest

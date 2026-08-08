@@ -1,0 +1,106 @@
+# ============================================================
+# HERMITIAN FULL: representation=hermitian + loss_space=rho, 300 epoch
+# 冒烟结论（50ep 投影后 Val Fid 0.5425 vs norm_b 0.4431，+0.099）：
+# 等距表示收敛显著加速，投入全量训练
+# ============================================================
+model_type: "edm"
+n_qubits: 2
+diffusion_timesteps: 1000
+beta_schedule: "cosine"
+beta_start: 1.0e-4
+beta_end: 0.02
+
+# --- 表示层 ---
+representation: "hermitian"
+cholesky_normalize: false
+
+# --- 主损失（显式顶层，避免 model 段读取歧义）---
+loss_space: "rho"
+
+# --- EDM noise schedule ---
+sigma_min: 0.001
+sigma_max: 1.22
+sigma_data_diag: 0.1756
+sigma_data_off: 0.1261
+sigma_data_per_dim: [0.18877706007555042, 0.17107041065139947, 0.17246132630998584, 0.1702733541383929, 0.1295984221574118, 0.1297590329457424, 0.11991557437854698, 0.11873853028785031, 0.12817648294695572, 0.12820924643007747, 0.13045420226082896, 0.13106596726759567, 0.1210794197985966, 0.11942238308782605, 0.12842681510297282, 0.1288281249169327]
+P_mean: -1.2
+P_std: 1.2
+rho: 7.0
+n_steps_eval: 35
+
+# --- 辅助损失 ---
+lambda_fid: 0.0
+lambda_fid_warmup: 1000
+lambda_meas: 0.0
+lambda_meas_warmup: 1000
+
+# --- Low-shot representation (scheme 1) ---
+use_arcsin_sqrt: true
+use_counts_channel: true
+use_shot_channel: false
+use_fisher_z: false
+
+# --- Model ---
+model:
+  dim: null
+  hidden_dim: 256
+  dim_mults: [1, 2, 4]
+  cond_dim: 128
+  cond_dropout_prob: 0.1
+  loss_space: "rho"
+
+  time_emb_dim: 256
+  attn_resolutions: [8]
+  num_res_blocks: 2
+
+# --- Training (全量 300 epoch) ---
+training:
+  batch_size: 128
+  learning_rate: 4.0e-3
+  lr_scheduler: "cosine"
+  warmup_steps: 500
+  epochs: 300
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 50
+  val_every: 10
+  log_every: 100
+
+# --- Variable-shot training ---
+use_variable_shots: true
+n_shots_min: 10
+n_shots_max: 50000
+
+# --- Data ---
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000
+  state_types:
+    pure_haar: 0.30
+    mixed_hs: 0.30
+    mixed_ginibre: 0.10
+    thermal: 0.10
+    product: 0.10
+    rqc: 0.10
+  regularization_eps: 1.0e-6
+  seed: 42
+
+# --- ERDM-style loss reweighting ---
+use_loss_reweighting: true
+
+# --- Evaluation ---
+evaluation:
+  n_samples_per_state: 20
+  iw_mmse: false
+  dps_scale: 0.0
+  ddim_steps: null
+  mle_max_iter: 5000
+  mle_regularization: 0.01
+  shot_levels: [10, 20, 30, 50, 100, 300]
+  n_repeats: 10
+  cfg_mode: none
+  cfg_weight: 4.0
+  cfg_weight_max: 2.0
+  cfg_n_ref: 1000

@@ -1,0 +1,103 @@
+# ============================================================
+# zj01 lambda_meas=0.3 (meas03) cfg4 评估配置
+# 基于 stage0_rhospace_norm_b_meas03.yaml，仅改 evaluation 段：
+#   cfg_mode: fixed, cfg_weight: 4.0（与 norm_b cfg4 协议一致，保证可比）
+# 目的：meas03 (lambda_meas=0.3, Val Fid 0.7519) 的正式 cfg4 评估
+# ============================================================
+model_type: "edm"
+n_qubits: 2
+diffusion_timesteps: 1000
+beta_schedule: "cosine"
+beta_start: 1.0e-4
+beta_end: 0.02
+
+# --- EDM noise schedule ---
+sigma_min: 0.001
+sigma_max: 1.22
+cholesky_normalize: true
+sigma_data_per_dim: [0.188126, 0.224821, 0.193872, 0.157761, 0.279667, 0.280843, 0.281294, 0.282385, 0.275968, 0.280702, 0.117214, 0.114985, 0.119020, 0.120285, 0.111495, 0.112217]
+sigma_data_diag: 0.2177
+sigma_data_off: 0.1983
+P_mean: -1.2
+P_std: 1.2
+rho: 7.0
+n_steps_eval: 35
+
+# --- Fidelity-aware auxiliary loss ---
+lambda_fid: 0.0
+lambda_fid_warmup: 1000
+
+# --- Measurement-consistency loss ---
+lambda_meas: 0.3
+lambda_meas_warmup: 1000
+
+# --- Low-shot representation (scheme 1) ---
+use_arcsin_sqrt: true
+use_counts_channel: true
+use_shot_channel: false
+use_fisher_z: false
+
+# --- Model ---
+model:
+  dim: null
+  hidden_dim: 256
+  dim_mults: [1, 2, 4]
+  cond_dim: 128
+  cond_dropout_prob: 0.1
+  loss_space: "rho"
+
+  time_emb_dim: 256
+  attn_resolutions: [8]
+  num_res_blocks: 2
+
+# --- Training ---
+training:
+  batch_size: 128
+  learning_rate: 4.0e-3
+  lr_scheduler: "cosine"
+  warmup_steps: 500
+  epochs: 300
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 50
+  val_every: 10
+  log_every: 100
+
+# --- Variable-shot training ---
+use_variable_shots: true
+n_shots_min: 10
+n_shots_max: 50000
+
+# --- Data ---
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000
+  state_types:
+    pure_haar: 0.30
+    mixed_hs: 0.30
+    mixed_ginibre: 0.10
+    thermal: 0.10
+    product: 0.10
+    rqc: 0.10
+  regularization_eps: 1.0e-6
+  seed: 42
+
+# --- ERDM-style loss reweighting ---
+use_loss_reweighting: true
+
+# --- Evaluation (cfg4 协议) ---
+evaluation:
+  n_samples_per_state: 20
+  iw_mmse: false
+  dps_scale: 0.0
+  ddim_steps: null
+  mle_max_iter: 5000
+  mle_regularization: 0.01
+  shot_levels: [10, 20, 30, 50, 100, 300]
+  n_repeats: 10
+  cfg_mode: fixed
+  cfg_weight: 4.0
+  cfg_weight_max: 2.0
+  cfg_n_ref: 1000

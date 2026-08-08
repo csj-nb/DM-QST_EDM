@@ -1,0 +1,108 @@
+# ============================================================
+# BLOCH FULL: representation=bloch (isometric), 300 epoch
+# 与 Hermitian B（stage0_herm_cmp_lr4e3.yaml）同配置对比：
+#   唯一差异 = 表示（Gell-Mann 等距基 15d vs Hermitian direct 16d）
+# 等距预测：sigma_data 各维 std 比 1.23（Hermitian ~1.6+），
+#   J^T J 谱/对角比 1.00x（herm_geometry_verify.json）
+# ============================================================
+model_type: "edm"
+n_qubits: 2
+diffusion_timesteps: 1000
+beta_schedule: "cosine"
+beta_start: 1.0e-4
+beta_end: 0.02
+
+# --- 表示层 ---
+representation: "bloch"
+cholesky_normalize: false
+
+# --- 主损失 ---
+loss_space: "rho"
+
+# --- EDM noise schedule ---
+sigma_min: 0.001
+sigma_max: 1.22
+sigma_data_diag: 0.51959
+sigma_data_off: 0.51959
+sigma_data_per_dim: [0.51839, 0.51904, 0.47966, 0.47495, 0.51271, 0.51284, 0.52182, 0.52426, 0.48432, 0.47769, 0.51371, 0.51531, 0.58475, 0.58130, 0.55611]
+P_mean: -1.2
+P_std: 1.2
+rho: 7.0
+n_steps_eval: 35
+
+# --- 辅助损失 ---
+lambda_fid: 0.0
+lambda_fid_warmup: 1000
+lambda_meas: 0.0
+lambda_meas_warmup: 1000
+
+# --- Low-shot representation (scheme 1) ---
+use_arcsin_sqrt: true
+use_counts_channel: true
+use_shot_channel: false
+use_fisher_z: false
+
+# --- Model ---
+model:
+  dim: null
+  hidden_dim: 256
+  dim_mults: [1, 2, 4]
+  cond_dim: 128
+  cond_dropout_prob: 0.1
+  loss_space: "rho"
+
+  time_emb_dim: 256
+  attn_resolutions: [8]
+  num_res_blocks: 2
+
+# --- Training (lr=4e-3 与 Hermitian B 对齐) ---
+training:
+  batch_size: 128
+  learning_rate: 4.0e-3
+  lr_scheduler: "cosine"
+  warmup_steps: 500
+  epochs: 300
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 50
+  val_every: 10
+  log_every: 100
+
+# --- Variable-shot training ---
+use_variable_shots: true
+n_shots_min: 10
+n_shots_max: 50000
+
+# --- Data ---
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000
+  state_types:
+    pure_haar: 0.30
+    mixed_hs: 0.30
+    mixed_ginibre: 0.10
+    thermal: 0.10
+    product: 0.10
+    rqc: 0.10
+  regularization_eps: 1.0e-6
+  seed: 42
+
+# --- ERDM-style loss reweighting ---
+use_loss_reweighting: true
+
+# --- Evaluation ---
+evaluation:
+  n_samples_per_state: 20
+  iw_mmse: false
+  dps_scale: 0.0
+  ddim_steps: null
+  mle_max_iter: 5000
+  mle_regularization: 0.01
+  shot_levels: [10, 20, 30, 50, 100, 300]
+  n_repeats: 10
+  cfg_mode: none
+  cfg_weight: 4.0
+  cfg_weight_max: 2.0
+  cfg_n_ref: 1000

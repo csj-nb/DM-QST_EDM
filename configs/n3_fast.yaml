@@ -1,0 +1,50 @@
+# Fast 3-qubit training config
+n_qubits: 3
+diffusion_timesteps: 400        # 1000→400, 更快
+beta_schedule: "cosine"
+beta_start: 1.0e-4
+beta_end: 0.02
+loss_type: "l2"
+
+model:
+  base_channels: 48             # 64→48, 减少参数
+  dim_mults: [1, 2]             # (1,2,4)→(1,2), 少一层下采样
+  cond_dim: 128
+  cond_dropout_prob: 0.1
+  time_emb_dim: 256
+  num_res_blocks: 1             # 2→1, 每层只一个ResBlock
+  attn_resolutions: [8]
+
+training:
+  batch_size: 512               # 4090够用
+  learning_rate: 3.0e-4         # 稍高初始lr, 更快收敛
+  lr_scheduler: "cosine"
+  warmup_steps: 100
+  epochs: 400
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 100
+  val_every: 20
+  log_every: 50
+
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000
+  state_types:
+    pure_haar: 0.40
+    mixed_hs: 0.30
+    mixed_ginibre: 0.10
+    thermal: 0.10
+    product: 0.10
+  regularization_eps: 1.0e-6
+  seed: 42
+
+evaluation:
+  n_samples_per_state: 1
+  ddim_steps: 100
+  mle_max_iter: 5000
+  mle_regularization: 0.01
+  shot_levels: [10, 20, 30, 50, 100, 300]
+  n_repeats: 10

@@ -1,0 +1,53 @@
+# 3-qubit Flow Matching config
+model_type: "flow"
+n_qubits: 3
+loss_type: "l2"               # l2 works well for velocity prediction
+
+model:
+  base_channels: 64            # Back to full capacity
+  dim_mults: [1, 2, 4]         # Full UNet depth
+  num_res_blocks: 2            # Back to 2 ResBlocks
+  cond_dim: 128
+  cond_dropout_prob: 0.1
+  time_emb_dim: 256
+  attn_resolutions: [8]
+
+training:
+  batch_size: 512
+  learning_rate: 2.0e-4
+  lr_scheduler: "cosine"
+  warmup_steps: 100
+  epochs: 500
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 100
+  val_every: 25
+  log_every: 50
+
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000
+  state_types:
+    pure_haar: 0.40
+    mixed_hs: 0.30
+    mixed_ginibre: 0.10
+    thermal: 0.10
+    product: 0.10
+  regularization_eps: 1.0e-6
+  seed: 42
+
+# DDPM-specific params (ignored by FlowMatching, kept for config compat)
+diffusion_timesteps: 400
+beta_schedule: "cosine"
+beta_start: 1.0e-4
+beta_end: 0.02
+
+evaluation:
+  n_samples_per_state: 1
+  ddim_steps: null            # Flow uses its own n_steps
+  mle_max_iter: 5000
+  mle_regularization: 0.01
+  shot_levels: [10, 20, 30, 50, 100, 300]
+  n_repeats: 10

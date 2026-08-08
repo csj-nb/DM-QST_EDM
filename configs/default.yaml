@@ -1,0 +1,63 @@
+# DM-QST Default Configuration
+# ================================
+
+# --- Core ---
+n_qubits: 2
+diffusion_timesteps: 1000
+beta_schedule: "cosine"        # linear | cosine
+beta_start: 1.0e-4
+beta_end: 0.02
+
+# --- Model Architecture ---
+model:
+  dim: null                    # auto-computed: 2 * (2^n_qubits)^2
+  hidden_dim: 256
+  dim_mults: [1, 2, 4]         # channel multipliers per resolution level
+  cond_dim: 128                # conditioning embedding dimension
+  cond_dropout_prob: 0.1       # dropout probability for classifier-free guidance
+  time_emb_dim: 256            # time embedding dimension
+  attn_resolutions: [8]        # resolutions at which to apply self-attention
+  num_res_blocks: 2            # number of ResNet blocks per level
+
+# --- Training ---
+training:
+  batch_size: 128
+  learning_rate: 2.0e-4
+  lr_scheduler: "cosine"
+  warmup_steps: 500
+  epochs: 300
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 50               # save checkpoint every N epochs
+  val_every: 10                # validate every N epochs
+  log_every: 100               # log every N steps
+
+# --- Data ---
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000   # total shots across all measurement bases
+  state_types:                 # proportion of each type
+    pure_haar: 0.30
+    mixed_hs: 0.30             # Hilbert-Schmidt
+    mixed_ginibre: 0.10        # Ginibre ensemble
+    thermal: 0.10
+    product: 0.10
+    rqc: 0.10                  # random quantum circuit outputs (needs qiskit)
+  regularization_eps: 1.0e-6
+  seed: 42
+
+# --- ERDM-style loss reweighting ---
+# Focus model capacity on intermediate noise levels via lognormal PDF.
+# See Rühling Cachay et al., ERDM (NeurIPS 2025), Eq. (4)-(6).
+use_loss_reweighting: true
+
+# --- Evaluation ---
+evaluation:
+  n_samples_per_state: 1       # number of diffusion samples per measurement
+  ddim_steps: 100              # DDIM acceleration steps (null for full DDPM)
+  mle_max_iter: 5000
+  mle_regularization: 0.01
+  shot_levels: [10, 20, 30, 50, 100, 300]
+  n_repeats: 10                # number of measurement repeats for statistics

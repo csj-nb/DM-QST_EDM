@@ -1,0 +1,53 @@
+# 3-qubit VDM config with low-rank constraint
+model_type: "vdm"
+n_qubits: 3
+loss_type: "l2"
+
+model:
+  base_channels: 64
+  dim_mults: [1, 2, 4]
+  num_res_blocks: 2
+  cond_dim: 128
+  cond_dropout_prob: 0.1
+  time_emb_dim: 256
+
+# VDM SNR schedule
+gamma_min: -15.0
+gamma_max: 15.0
+
+# Low-rank constraint (stronger for 3-qubit where rank matters more)
+lambda_rank: 0.05
+lambda_rank_warmup: 2000
+
+training:
+  batch_size: 384
+  learning_rate: 2.0e-4
+  lr_scheduler: "cosine"
+  warmup_steps: 100
+  epochs: 500
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 100
+  val_every: 25
+  log_every: 50
+
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000
+  regularization_eps: 1.0e-6
+  seed: 42
+
+evaluation:
+  n_samples_per_state: 1
+  ddim_steps: 100          # VDM: ODE integration steps
+  mle_max_iter: 5000
+  mle_regularization: 0.01
+  shot_levels: [10, 20, 30, 50, 100, 300]
+  n_repeats: 10
+
+diffusion_timesteps: 1000
+beta_schedule: "cosine"
+beta_start: 1.0e-4
+beta_end: 0.02

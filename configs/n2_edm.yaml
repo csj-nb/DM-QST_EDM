@@ -1,0 +1,86 @@
+# 2-qubit QST-EDM config
+n_qubits: 2
+model_type: "edm"
+
+# --- EDM noise schedule ---
+sigma_min: 0.001
+sigma_max: 1.22          # Calibrated: 5x global std (CHANGELOG 2026-07-31 table).
+                         # Was 0.8, but ~21% of LogNormal(-1.2,1.2) training
+                         # sigmas were clamped at the old sigma_max, biasing
+                         # learning near the boundary.
+sigma_data_diag: 0.2341  # Calibrated from 10000 random 2-qubit states (2026-07-31)
+sigma_data_off: 0.2183   # Calibrated from 10000 random 2-qubit states (2026-07-31)
+
+# --- Training noise distribution ---
+P_mean: -1.2
+P_std: 1.2
+
+# --- Sampling ---
+rho: 7.0                # Heun rho-scheduling exponent
+n_steps_eval: 35        # Default evaluation steps
+
+# --- Model architecture ---
+model:
+  base_channels: 64
+  dim_mults: [1, 2, 4]
+  num_res_blocks: 2
+  cond_dim: 128
+  cond_dropout_prob: 0.1
+  time_emb_dim: 256
+
+# --- Physics-informed loss ---
+# NOTE (2026-08-02): lambda_rank disabled. Penalizing (1 - purity) biases the
+# model toward pure states, conflicting with the training distribution
+# (60% mixed states: HS 30% + Ginibre 10% + thermal 10% + product 10%).
+lambda_rank: 0.0
+lambda_rank_warmup: 2000
+lambda_meas: 0.0
+lambda_meas_warmup: 1000
+
+# --- ERDM-style loss reweighting ---
+# Focus model capacity on intermediate noise levels via lognormal PDF.
+# See Rühling Cachay et al., ERDM (NeurIPS 2025), Eq. (4)-(6).
+# Ablation: set to false to disable (equivalent to standard EDM loss).
+use_loss_reweighting: true
+
+# --- Training ---
+training:
+  batch_size: 256
+  learning_rate: 2.0e-4
+  lr_scheduler: "cosine"
+  warmup_steps: 500
+  epochs: 300
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 50
+  val_every: 20
+  log_every: 100
+
+# --- Variable-shot training ---
+# Randomize measurement shot count per sample during training.
+# This exposes the model to varying noise levels, improving low-shot generalization.
+use_variable_shots: true
+n_shots_min: 10
+n_shots_max: 50000
+
+# --- Data ---
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000
+  state_types:
+    pure_haar: 0.40
+    mixed_hs: 0.30
+    mixed_ginibre: 0.10
+    thermal: 0.10
+    product: 0.10
+  regularization_eps: 1.0e-6
+  seed: 42
+
+# --- Evaluation ---
+evaluation:
+  shot_levels: [10, 20, 30, 50, 100, 300]
+  n_repeats: 10
+  mle_max_iter: 5000
+  mle_regularization: 0.01

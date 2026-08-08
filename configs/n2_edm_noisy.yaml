@@ -1,0 +1,94 @@
+# 2-qubit QST-EDM config with realistic noise model
+# =============================================================================
+# This config enhances training data with realistic quantum device noise
+# (readout error, gate error) to improve generalization to real hardware.
+#
+# Usage:
+#   python experiments/train_noisy.py --config configs/n2_edm_noisy.yaml
+# =============================================================================
+
+n_qubits: 2
+model_type: "edm"
+
+# --- EDM noise schedule ---
+sigma_min: 0.001
+sigma_max: 0.8
+sigma_data_diag: 0.2341  # Calibrated from 10000 random 2-qubit states
+sigma_data_off: 0.2183   # Calibrated from 10000 random 2-qubit states
+
+# --- Training noise distribution ---
+P_mean: -1.2
+P_std: 1.2
+
+# --- Sampling ---
+rho: 7.0                # Heun rho-scheduling exponent
+n_steps_eval: 35        # Default evaluation steps
+
+# --- Model architecture ---
+model:
+  base_channels: 64
+  dim_mults: [1, 2, 4]
+  num_res_blocks: 2
+  cond_dim: 128
+  cond_dropout_prob: 0.1
+  time_emb_dim: 256
+
+# --- Physics-informed loss ---
+lambda_rank: 0.0
+lambda_rank_warmup: 2000
+lambda_meas: 0.0
+lambda_meas_warmup: 1000
+
+# --- ERDM-style loss reweighting ---
+use_loss_reweighting: true
+
+# --- Realistic noise model ---
+# Adds readout error to synthetic measurements for more realistic training.
+# This bridges the gap between simulation and real quantum hardware.
+noise_model:
+  enabled: true
+  readout_error: 0.005       # 0.5% readout misclassification (IBM typical)
+  single_qubit_gate_error: 0.001
+  two_qubit_gate_error: 0.01
+  # Optional: use real IBM device noise (requires IBM Quantum account)
+  # ibm_backend: "ibm_brisbane"  # Uncomment to use real device noise
+
+# --- Training ---
+training:
+  batch_size: 256
+  learning_rate: 2.0e-4
+  lr_scheduler: "cosine"
+  warmup_steps: 500
+  epochs: 300
+  ema_decay: 0.9999
+  gradient_clip: 1.0
+  save_every: 50
+  val_every: 20
+  log_every: 100
+
+# --- Variable-shot training ---
+use_variable_shots: true
+n_shots_min: 10
+n_shots_max: 50000
+
+# --- Data ---
+data:
+  n_train_states: 50000
+  n_val_states: 5000
+  n_test_states: 5000
+  n_measurement_shots: 10000
+  state_types:
+    pure_haar: 0.40
+    mixed_hs: 0.30
+    mixed_ginibre: 0.10
+    thermal: 0.10
+    product: 0.10
+  regularization_eps: 1.0e-6
+  seed: 42
+
+# --- Evaluation ---
+evaluation:
+  shot_levels: [10, 20, 30, 50, 100, 300]
+  n_repeats: 10
+  mle_max_iter: 5000
+  mle_regularization: 0.01
